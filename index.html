@@ -44,10 +44,9 @@
       let windowWidth = window.innerWidth;
       let windowHeight = window.innerHeight;
 
-      let windowLeft = window.screenX;
-      let windowTop = window.screenY;
+      let windowLeft = window.screenX||window.screenLeft;
+      let windowTop = window.screenY||window.screenTop;
 
-      // todo 取视口而不是整个窗口
       canvas.style.top = -windowTop + 'px';
       canvas.style.left = -windowLeft + 'px';
 
@@ -135,12 +134,15 @@
   }
 
   function openNewWindow(){
-    window.open(window.location.href, '_blank');
+    window.open(window.location.href, '_blank',`left=100,top=100,width=300,height=300`);
   }
 
   let system = new ParticleSystem();
   system.update();
-  window.addEventListener('beforeunload', system.unload)
+  window.addEventListener('beforeunload', function () {
+    cancelAnimationFrame(frId)
+    system.unload();
+  });
 </script>
 </body>
 </html>
