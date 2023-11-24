@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>multipleWindowConnection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+        #canvas {
+            width: 0;
+            height: 0;
+            position: fixed;
+        }
+        button{
+            position: relative;
+            z-index: 9;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<button onclick="openNewWindow()">打开新窗口</button>
+<script>
+  const canvas = document.getElementById('canvas');
+  const {availWidth, availHeight} = window.screen
+  canvas.width = availWidth
+  canvas.height = availHeight
+  canvas.style.width = availWidth + 'px';
+  canvas.style.height = availHeight + 'px';
+  const ctx = canvas.getContext('2d');
+  let frId = null;
+
+  class Point {
+    constructor(id) {
+      this.id = id;
+      this.color = this.getRandomColor();
+      this.getXY()
+    }
+
+    getXY() {
+      let windowWidth = window.innerWidth;
+      let windowHeight = window.innerHeight;
+
+      let windowLeft = window.screenX;
+      let windowTop = window.screenY;
+
+      // todo 取视口而不是整个窗口
+      canvas.style.top = -windowTop + 'px';
+      canvas.style.left = -windowLeft + 'px';
+
+      this.x = windowLeft + windowWidth / 2
+      this.y = windowTop + windowHeight / 2
+    }
+
+    getRandomColor() {
+      let randomColor = Math.floor(Math.random() * 16777216); // 16777216 = 0xFFFFFF + 1
+      return '#' + ('000000' + randomColor.toString(16)).slice(-6);
+    }
+  }
+
+  class ParticleSystem {
+
+    timestamp = 0;
+
+    constructor() {
+      this.timestamp = new Date().getTime();
+      this.points = this.getPointsFromLocalStorage();
+      this.center = new Point(this.timestamp)
+      this.points.push(this.center)
+      this.savePointsToLocalStorage(this.points)
+    }
+
+
+    update() {
+      // 更新点坐标
+      this.points = this.getPointsFromLocalStorage();
+      this.center.getXY()
+      this.savePointsToLocalStorage(this.points.map(p =>
+          p.id === this.center.id ? this.center : p
+      ))
+      this.draw()
+      frId = requestAnimationFrame(this.update.bind(this));
+    }
+
+    draw() {
+      // 重绘
+      ctx.clearRect(0, 0, window.screen.availWidth, window.screen.availHeight);
+
+      for (let i = 0; i < this.points.length; i++) {
+        const point = this.points[i];
+        ctx.fillStyle = point.color;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 10, 0, 2 * Math.PI); // 半径为10像素
+        ctx.fill();
+      }
+      // 连接所有点
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'cyan';
+      for (let i = 0; i < this.points.length; i++) {
+        const point = this.points[i];
+        if (i === 0) {
+          ctx.moveTo(point.x, point.y); // 移动到第一个点，不画线
+        }
+        else {
+          ctx.lineTo(point.x, point.y); // 画线到当前点
+        }
+      }
+
+      // 如果点的数量大于2，则将最后一个点与第一个点连接
+      if (this.points.length > 2) {
+        const firstPoint = this.points[0];
+        ctx.lineTo(firstPoint.x, firstPoint.y);
+      }
+
+      ctx.stroke();
+
+    }
+
+    getPointsFromLocalStorage() {
+      return JSON.parse(localStorage.getItem('points')) || [];
+    }
+
+    savePointsToLocalStorage(points) {
+      localStorage.setItem('points', JSON.stringify(points));
+    }
+
+    unload() {
+      this.savePointsToLocalStorage(this.points.filter(p => p.id !== this.center.id))
+      cancelAnimationFrame(frId)
+    }
+  }
+
+  function openNewWindow(){
+    window.open(window.location.href, '_blank');
+  }
+
+  let system = new ParticleSystem();
+  system.update();
+  window.addEventListener('beforeunload', system.unload)
+</script>
+</body>
+</html>
