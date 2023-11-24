@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>multipleWindowConnection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        button {
+            position: relative;
+            z-index: 9;
+            cursor: pointer;
+        }
+
+        #canvas {
+            width: 0;
+            height: 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<button onclick="openNewWindow()">打开新窗口</button>
+<button onclick="clearCache()">清除缓存</button>
+<script>
+  const canvas = document.getElementById('canvas');
+  const {availWidth, availHeight} = window.screen
+  canvas.width = availWidth
+  canvas.height = availHeight
+  canvas.style.width = availWidth + 'px';
+  canvas.style.height = availHeight + 'px';
+  const ctx = canvas.getContext('2d');
+  let frId = null;
+
+  class Point {
+
+    constructor(id) {
+      this.id = id;
+      this.color = this.getRandomColor();
+      this.getXY()
+    }
+
+    getXY() {
+      let windowWidth = window.innerWidth;
+      let windowHeight = window.innerHeight;
+
+      let windowLeft = window.screenX || window.screenLeft;
+      let windowTop = window.screenY || window.screenTop;
+
+      canvas.style.top = -windowTop + 'px';
+      canvas.style.left = -windowLeft + 'px';
+
+      this.x = windowLeft + windowWidth / 2
+      this.y = windowTop + windowHeight / 2
+    }
+
+    getRandomColor() {
+      let randomColor = Math.floor(Math.random() * 16777216); // 16777216 = 0xFFFFFF + 1
+      return '#' + ('000000' + randomColor.toString(16)).slice(-6);
+    }
+  }
+
+  class clientPoint {
+    particleCount = 150;
+    totalCount = 300;
+
+    constructor(point) {
+      this.color = point.color;
+      this.id = point.id;
+      this.particles = [];
+      this.linkPaticles =  []
+      this.x = point.x
+      this.y = point.y
+      for (let i = 0; i < 50; i++) {
+        this.linkPaticles.push(new Particle(this.x, this.y, this.color, null))
+      }
+      setInterval(() => {
+        this.addParticles()
+      }, 350)
+    }
+
+    setXY(x, y) {
+      this.x = x
+      this.y = y
+    }
+
+    addParticles() {
+      // 初始化粒子
+      for (let i = 0; i < this.particleCount; i++) {
+        if (this.particles.length < this.totalCount) {
+          this.particles.push(new Particle(this.x, this.y, this.color));
+        }
+      }
+    }
+
+    linkTo(targetX, targetY) {
+        this.linkPaticles.map(p=>{
+          p.setTarget(targetX, targetY)
+        })
+    }
+
+    diffusion() {
+      this.particles = this.particles.filter(particle => {
+        particle.update();
+        if (particle.size > 0 && particle.opacity > 0) {
+          particle.draw();
+        }
+        return particle.size > 0 && particle.opacity > 0
+      }) || [];
+      this.linkPaticles = this.linkPaticles.filter(particle => {
+        particle.update();
+        if (particle.size > 0.5 && particle.opacity > 0.1) {
+          particle.draw();
+        }else{
+          particle.setXY(this.x, this.y)
+        }
+        return particle.size > 0 && particle.opacity > 0
+      }) || [];
+
+    }
+  }
+
+
+  // 每个粒子对象
+  class Particle {
+    constructor(x, y, color, target = null) {
+      this.target = target;
+      this.x = x;
+      this.y = y;
+      this.color = color;
+      this.angle = target ? Math.atan2(target.targetY - y, target.targetX - x) : Math.random() * Math.PI * 2;
+    /*  this.rawDist = target ? Math.sqrt(
+          Math.pow(this.x - target.targetX, 2) +
+          Math.pow(this.y - target.targetY, 2)
+      ) : 0;*/
+      // 随机速度和方向
+      this.speed = Math.random() * 2 + 1;
+
+      // 大小和透明度
+      this.size = Math.random() * 10 + 5;
+      this.opacity = 1 - Math.random();
+    }
+    setXY(x, y) {
+      this.x = x
+      this.y = y
+      this.size = Math.random() * 10 + 5;
+      this.opacity = 1 - Math.random();
+    }
+    setTarget(targetX, targetY) {
+      this.target = {
+        targetX,
+        targetY
+      }
+    }
+
+    update() {
+      // 每次更新位置
+      if (this.target) {
+        let dist = Math.sqrt(
+            Math.pow(this.x - this.target.targetX, 2) +
+            Math.pow(this.y - this.target.targetY, 2)
+        );
+        // 根据距离更新变化率
+        let rate = 1 - dist / 1000;
+        // 到达鼠标位置rate为0,否则递减
+        this.opacity -= rate * 0.01;
+        this.size -= rate * 0.05;
+        this.angle = Math.atan2(this.target.targetY - this.y, this.target.targetX - this.x)
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+
+      }
+      else {
+        this.angle += 5 / this.size * 0.05;
+        this.opacity -= 0.01;
+        this.size -= 0.2;
+        this.x += Math.cos(this.angle) * this.speed;
+        this.y += Math.sin(this.angle) * this.speed;
+      }
+    }
+
+    draw() {
+      ctx.fillStyle = this.color;
+      ctx.globalAlpha = this.opacity;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+
+  class ParticleSystem {
+
+    timestamp = 0;
+
+    constructor() {
+      this.timestamp = new Date().getTime();
+      this.points=[]
+      this.getPointsFromLocalStorage();
+      this.center = new Point(this.timestamp)
+      this.points.push(new clientPoint(this.center))
+      this.savePointsToLocalStorage(this.points)
+    }
+
+
+    update() {
+      // 更新点坐标
+      this.getPointsFromLocalStorage();
+      this.center.getXY()
+      this.savePointsToLocalStorage(this.points.map(p =>{
+        if( p.id === this.center.id){
+          p.setXY(this.center.x,this.center.y)
+        }
+        return p
+      }))
+      this.draw()
+      frId = requestAnimationFrame(this.update.bind(this));
+    }
+
+    draw() {
+      // 重绘
+      ctx.clearRect(0, 0, window.screen.availWidth, window.screen.availHeight);
+
+      for (let i = 0; i < this.points.length; i++) {
+        const point = this.points[i];
+        point.diffusion();
+        if (i === this.points.length - 1) {
+          point.linkTo(this.points[0].x, this.points[0].y)
+        }
+        else {
+          point.linkTo(this.points[i + 1].x, this.points[i + 1].y)
+        }
+      }
+
+
+    }
+
+    getPointsFromLocalStorage() {
+      if (!this.points) {
+        this.points = (JSON.parse(localStorage.getItem('points')) || '[]')?.map(point => {
+          new clientPoint(point)
+        })
+      }
+      else {
+        JSON.parse((localStorage.getItem('points'))|| '[]')?.map(point => {
+          let p = this.points.find(p => p.id === point.id)
+          if (p) {
+            p.setXY(point.x, point.y)
+            // 更新 this.points 中 p 的xy
+          }
+          else {
+            this.points.push(new clientPoint(point))
+          }
+        })
+      }
+    }
+
+    savePointsToLocalStorage(points) {
+      localStorage.setItem('points', JSON.stringify(points));
+    }
+
+    unload() {
+      // todo 广播删除事件
+      this.savePointsToLocalStorage(this.points.filter(p => p.id !== this.center.id))
+      cancelAnimationFrame(frId)
+    }
+  }
+
+  function openNewWindow() {
+    window.open(window.location.href, '_blank', `left=100,top=100,width=300,height=300`);
+  }
+  function clearCache() {
+    cancelAnimationFrame(frId)
+    system=null
+    localStorage.clear();
+    ctx.clearRect(0, 0, window.screen.availWidth, window.screen.availHeight);
+  }
+
+  let system = new ParticleSystem();
+  system.update();
+  window.addEventListener('beforeunload', function () {
+    cancelAnimationFrame(frId)
+    system.unload();
+  });
+
+
+</script>
+</body>
+</html>
