@@ -23,6 +23,7 @@
 <body>
 <canvas id="canvas"></canvas>
 <button onclick="openNewWindow()">打开新窗口</button>
+<button onclick="openParticle()">粒子效果</button>
 <script>
   const canvas = document.getElementById('canvas');
   const {availWidth, availHeight} = window.screen
@@ -135,6 +136,9 @@
 
   function openNewWindow(){
     window.open(window.location.href, '_blank',`left=100,top=100,width=300,height=300`);
+  }
+  function openParticle(){
+    window.open('./particle.html', '_blank');
   }
 
   let system = new ParticleSystem();
